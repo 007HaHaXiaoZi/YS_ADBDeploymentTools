@@ -12,7 +12,10 @@ $releaseVersion = [Version]::Parse($Version).ToString()
 if (!$PrivateKey) { $PrivateKey = Join-Path $root '.release-private\publisher-private.pem' }
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root ".build\releases\$releaseVersion" }
 $output = [IO.Path]::GetFullPath($OutputDirectory)
-& (Join-Path $root 'YS_ADBReleaseTool.exe') publish-github $root $output $Repository $releaseVersion $PrivateKey $Notes
+$source = Join-Path $root ('.build\release-source-' + [Guid]::NewGuid().ToString('N'))
+$null = New-Item -ItemType Directory -Path $source
+Copy-Item -LiteralPath (Join-Path $root 'YS_ADBDeploymentTools.exe') -Destination $source
+& (Join-Path $root 'YS_ADBReleaseTool.exe') publish-github $source $output $Repository $releaseVersion $PrivateKey $Notes
 if ($LASTEXITCODE -ne 0) { throw '生成签名更新包失败。' }
 if (!$Upload) { Write-Output "已生成本地文件：$output；加 -Upload 才会上传。"; return }
 
