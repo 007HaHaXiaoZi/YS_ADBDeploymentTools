@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
+  <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  <AssemblyName>YS_ADBReleaseTool</AssemblyName><RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  <RuntimeFrameworkVersion>9.0.11</RuntimeFrameworkVersion><SelfContained>true</SelfContained>
+  <PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><DebugType>none</DebugType>
+ </PropertyGroup>
+ <ItemGroup><Compile Include="../AdbDeploymentTool/Updates.cs" Link="Updates.cs"/><Compile Include="../AdbDeploymentTool/Deployment.cs" Link="Deployment.cs"/></ItemGroup>
+ <ItemGroup><Compile Include="../AdbDeploymentTool/ApplicationIdentity.cs" Link="ApplicationIdentity.cs"/><EmbeddedResource Include="../../publisher-public.pem" LogicalName="publisher-public.pem" /></ItemGroup>
+</Project>
