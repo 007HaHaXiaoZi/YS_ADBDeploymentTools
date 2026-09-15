@@ -47,7 +47,12 @@ internal static partial class Program
         Assert(states["YsSlamSensorSettingConfig.yaml"].Presence == Presence.Error, "Permission errors are not missing files");
         Assert(states["libdsp_wrapper.so"].Presence == Presence.Present, "Library presence detected");
         Assert(fake.Commands.All(c => c.Serial == "chosen-device" && c.Args[0] == "shell"), "Inspection reads only selected device");
-        Assert(fake.Commands.All(c => !new[] { "root", "remount", "install", "push", "reboot" }.Contains(c.Args[0])), "Inspection never mutates device");
+        Assert(fake.Commands.All(c => !new[] { "remount", "install", "push", "reboot" }.Contains(c.Args[0])), "Inspection never remounts, writes or reboots");
+        Assert(fake.RootCalls == 1 && states["YsSlamSensorSettingConfig.yaml"].Label == "权限不足", "Denied read retries root once and reports permission failure");
+        fake.AllowRootRead = true;
+        states = await service.InspectAsync("chosen-device", packages, CancellationToken.None);
+        Assert(states["YsSlamSensorSettingConfig.yaml"].Presence == Presence.Present, "Protected YAML becomes visible after root retry");
+        Assert(fake.Commands.Any(c => c.Args.Length > 1 && c.Args[1] == "ls -ld '/mnt/vendor/persist/calibdata/slam/YsSlamSensorSettingConfig.yaml'"), "YAML inspection uses persist calibdata slam path");
         fake.PackageList = "";
         states = await service.InspectAsync("chosen-device", packages, CancellationToken.None);
         Assert(states["Unity"].Presence == Presence.Error, "Empty pm output cannot mark every app uninstalled");
@@ -108,6 +113,9 @@ internal static partial class Program
     {
         public string PackageList = "package:com.horeal.UnityAndroid\npackage:com.example.customlauncher.extra\n";
         public List<(string? Serial, string[] Args)> Commands = [];
+        public int RootCalls;
+        public bool AllowRootRead;
+        public Task EnsureRootAsync(string serial, CancellationToken token) { RootCalls++; return Task.CompletedTask; }
         public Task EnsureRootAndRemountAsync(string serial, CancellationToken token) => throw new Exception("Inspection cannot root or remount");
         public Task<CommandResult> RunAsync(string? serial, CancellationToken token, params string[] args)
         {
@@ -116,7 +124,7 @@ internal static partial class Program
             if (args[1] == "pm list packages") return Task.FromResult(new CommandResult(0, PackageList, AdbClient.BinderWarning));
             if (args[1].StartsWith("test -d")) return Task.FromResult(new CommandResult(0, "drwxrwxr-x files"));
             if (args[1].Contains("CameraParametersSY.json")) throw new AdbCommandException("ls", new(1, "", "No such file or directory"));
-            if (args[1].Contains("YsSlamSensorSettingConfig.yaml")) throw new AdbCommandException("ls", new(1, "", "Permission denied"));
+            if (args[1].Contains("YsSlamSensorSettingConfig.yaml") && !(AllowRootRead && RootCalls > 0)) throw new AdbCommandException("ls", new(1, "", "Permission denied"));
             if (args[1].StartsWith("head -c")) return Task.FromResult(new CommandResult(0, "{\"device\":true}\n", AdbClient.BinderWarning));
             return Task.FromResult(new CommandResult(0, "-rw-r--r-- 1 root root 114 config\n"));
         }

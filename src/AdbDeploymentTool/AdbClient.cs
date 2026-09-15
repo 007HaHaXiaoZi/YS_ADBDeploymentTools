@@ -27,14 +27,14 @@ internal sealed class AdbClient(string adbPath, Action<string> log, TimeSpan? co
     private static bool IsRoot(CommandResult result) => result.ExitCode == 0 &&
         Regex.IsMatch(result.StandardOutput, @"(?:^|\s)uid=0(?:\(|\s|$)");
 
-    private async Task EnsureRootAsync(string serial, CancellationToken token)
+    public async Task EnsureRootAsync(string serial, CancellationToken token)
     {
         // root 不等于 remount 成功，但已有 root 时无需重复重启 adbd。
         var before = await RunRawAsync(serial, token, "shell", "id");
         if (IsRoot(before)) { log("设备已经具有 root 权限（uid=0），跳过 adb root。"); return; }
         var root = await RunRawAsync(serial, token, "root");
         if (ContainsAny(root.Output, "cannot run as root", "adbd cannot run as root"))
-            throw new InvalidOperationException("设备不允许 adb root，无法写入 vendor/system_ext 分区。");
+            throw new InvalidOperationException("设备不允许 adb root，无法获取受保护文件的访问权限。");
         if (root.ExitCode != 0)
             log($"adb root 的真实退出码为 {root.ExitCode}；等待设备上线后独立验证 uid，不把该退出码改写为 0。");
         await WaitForDeviceAsync(serial, token);

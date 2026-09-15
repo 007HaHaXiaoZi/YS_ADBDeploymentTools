@@ -17,7 +17,19 @@ internal static class ConfigurationPreview
         var text = Encoding.UTF8.GetString(data.AsSpan(0, Math.Min(data.Length, Limit)));
         return data.Length > Limit ? text + "\n\n[预览截断：文件超过 64 KiB]" : text;
     }
-    public static string Tooltip(string text) => text.Length <= 3000 ? text : text[..3000] + "\n\n[悬停预览已截断；双击部署部分名称或设备状态打开可滚动预览]";
+    public static string Tooltip(string text)
+    {
+        var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        var clipped = lines.Length > 8;
+        var preview = lines.Take(8).Select(line =>
+        {
+            line = line.Replace("\t", "  ");
+            if (line.Length <= 50) return line;
+            clipped = true;
+            return line[..49] + "…";
+        }).ToArray();
+        return string.Join("\n", preview) + (clipped ? "\n… 双击名称或设备状态查看完整预览" : "");
+    }
 }
 
 internal sealed class DeviceInspectionService(IAdbClient adb)
@@ -30,6 +42,26 @@ internal sealed class DeviceInspectionService(IAdbClient adb)
         IReadOnlyDictionary<string, string?> packages, CancellationToken token)
     {
         var result = new Dictionary<string, DeviceComponentState>();
+        var rootAttempted = false;
+        string? rootError = null;
+        async Task<CommandResult> ReadFileAsync(string command)
+        {
+            try { return await adb.RunAsync(serial, token, "shell", command); }
+            catch (AdbCommandException ex) when (ex.Result.Output.Contains("Permission denied", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!rootAttempted)
+                {
+                    rootAttempted = true;
+                    try { await adb.EnsureRootAsync(serial, token); }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception error) { rootError = error.Message; }
+                }
+                if (rootError != null) throw new UnauthorizedAccessException("权限不足；获取 root 失败：" + rootError + "\n" + ex.Message, ex);
+                try { return await adb.RunAsync(serial, token, "shell", command); }
+                catch (AdbCommandException retry) when (retry.Result.Output.Contains("Permission denied", StringComparison.OrdinalIgnoreCase))
+                { throw new UnauthorizedAccessException("权限不足：已验证 root，设备仍拒绝访问。\n" + retry.Message, retry); }
+            }
+        }
         HashSet<string>? installed = null;
         string? packageError = null;
         try
@@ -55,7 +87,7 @@ internal sealed class DeviceInspectionService(IAdbClient adb)
             }
             try
             {
-                var file = await adb.RunAsync(serial, token, "shell", "ls -ld " + ShellQuote(component.Target));
+                var file = await ReadFileAsync("ls -ld " + ShellQuote(component.Target));
                 if (string.IsNullOrWhiteSpace(file.StandardOutput))
                     result[component.Id] = new(Presence.Error, "检测失败", "设备没有返回文件信息。");
                 else if (file.StandardOutput.TrimStart().StartsWith('d'))
@@ -68,7 +100,7 @@ internal sealed class DeviceInspectionService(IAdbClient adb)
                     {
                         try
                         {
-                            var read = await adb.RunAsync(serial, token, "shell", $"head -c {ConfigurationPreview.Limit + 1} < {ShellQuote(component.Target)}");
+                            var read = await ReadFileAsync($"head -c {ConfigurationPreview.Limit + 1} < {ShellQuote(component.Target)}");
                             preview = read.StandardOutput;
                             if (Encoding.UTF8.GetByteCount(preview) > ConfigurationPreview.Limit) preview += "\n\n[预览截断：文件超过 64 KiB]";
                         }
@@ -79,6 +111,7 @@ internal sealed class DeviceInspectionService(IAdbClient adb)
                 }
             }
             catch (OperationCanceledException) { throw; }
+            catch (UnauthorizedAccessException ex) { result[component.Id] = new(Presence.Error, "权限不足", component.Target + "\n" + ex.Message); }
             catch (AdbCommandException ex) when (ex.Result.Output.Contains("No such file or directory", StringComparison.OrdinalIgnoreCase)
                 && !ex.Result.Output.Contains("Permission denied", StringComparison.OrdinalIgnoreCase))
             { result[component.Id] = new(Presence.Absent, "不存在", component.Target); }

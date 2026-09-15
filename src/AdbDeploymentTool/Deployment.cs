@@ -88,6 +88,7 @@ internal interface IAdbClient
 {
     Task<CommandResult> RunAsync(string? serial, CancellationToken token, params string[] arguments);
     Task EnsureRootAndRemountAsync(string serial, CancellationToken token);
+    Task EnsureRootAsync(string serial, CancellationToken token);
 }
 
 internal sealed class DeploymentService(IAdbClient adb, Action<string> log)

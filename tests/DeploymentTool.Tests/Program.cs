@@ -127,7 +127,7 @@ internal static partial class Program
         byte[] executable = Encoding.UTF8.GetBytes("test executable"), effect = Encoding.UTF8.GetBytes("{\"effect\":2}"), existing = Encoding.UTF8.GetBytes("original exe");
         File.WriteAllBytes(Path.Combine(install, UpdateService.ExeName), existing);
         File.WriteAllText(Path.Combine(install, "tools", "CameraParametersSY.json"), "{\"keep\":true}");
-        var manifest = new ReleaseManifest(UpdateService.Product, "2.0.1", "test", [Entry(UpdateService.ExeName, executable), Entry("tools/CameraEffect.json", effect)]);
+        var manifest = new ReleaseManifest(UpdateService.Product, "99.0.0", "test", [Entry(UpdateService.ExeName, executable), Entry("tools/CameraEffect.json", effect)]);
         var release = Sign(manifest, rsa);
         var tampered = release.ManifestBytes.ToArray(); tampered[^1] ^= 1;
         Throws(() => UpdateService.Verify(tampered, release.Signature, settings.PublicKeyPem), "Tampered signature");
@@ -146,14 +146,14 @@ internal static partial class Program
         handler.Content[new Uri(manifest.Files[0].Url).AbsoluteUri] = executable;
         handler.Content[new Uri(manifest.Files[1].Url).AbsoluteUri] = effect;
         using var updater = new UpdateService(install, settings, _ => { }, handler);
-        Assert((await updater.CheckAsync(CancellationToken.None))?.Manifest.Version == "2.0.1", "Discover newer signed version");
+        Assert((await updater.CheckAsync(CancellationToken.None))?.Manifest.Version == "99.0.0", "Discover newer signed version");
         // 模拟 GitHub latest → 指定版本 → 资产域名的跳转，签名仍验证原始下载字节。
         handler.Redirects[settings.ManifestUrl] = "/tagged/manifest.json";
         handler.Redirects["https://updates.example.test/tagged/manifest.json"] = "https://assets.example.test/manifest";
         handler.Content["https://assets.example.test/manifest"] = release.ManifestBytes;
         handler.Redirects[settings.ManifestUrl + ".sig"] = "https://assets.example.test/signature";
         handler.Content["https://assets.example.test/signature"] = release.Signature;
-        Assert((await updater.CheckAsync(CancellationToken.None))?.Manifest.Version == "2.0.1", "GitHub-style cross-host and relative HTTPS redirects");
+        Assert((await updater.CheckAsync(CancellationToken.None))?.Manifest.Version == "99.0.0", "GitHub-style cross-host and relative HTTPS redirects");
         handler.Redirects[settings.ManifestUrl] = "http://unsafe.example.test/manifest";
         await ThrowsAsync(() => updater.CheckAsync(CancellationToken.None), "HTTPS redirect downgrade rejected");
         handler.Redirects[settings.ManifestUrl] = settings.ManifestUrl;
@@ -212,6 +212,7 @@ internal static partial class Program
             return Task.FromResult(new CommandResult(0, arguments[0] == "install" ? InstallFailure ? "Failure [INSTALL_FAILED]" : "Success" : ""));
         }
         public Task EnsureRootAndRemountAsync(string serial, CancellationToken token) { RootCalls++; return Task.CompletedTask; }
+        public Task EnsureRootAsync(string serial, CancellationToken token) { RootCalls++; return Task.CompletedTask; }
     }
     private sealed class FakeHttp : HttpMessageHandler
     {
