@@ -105,13 +105,13 @@ internal sealed class DeploymentService(IAdbClient adb, Action<string> log)
         }
         foreach (var item in plan.Items.Where(x => x.Component.Group == DeploymentGroup.Unity))
         {
-            if (item.Component.Id == "Unity") await InstallAsync(serial, item.LocalPath, token);
+            if (item.Component.Id == "Unity") await InstallAsync(serial, item.LocalPath, "Unity", token);
             else await PushAsync(serial, item, false, token);
         }
         var launcher = plan.Items.FirstOrDefault(x => x.Component.Id == "Launcher");
         if (launcher != null)
         {
-            await InstallAsync(serial, launcher.LocalPath, token);
+            await InstallAsync(serial, launcher.LocalPath, "Launcher", token);
             await adb.EnsureRootAndRemountAsync(serial, token);
             log("备份系统 Launcher3QuickStep；已有备份保持不变。");
             await adb.RunAsync(serial, token, "shell", "cd /system_ext/priv-app/Launcher3QuickStep && " +
@@ -126,13 +126,30 @@ internal sealed class DeploymentService(IAdbClient adb, Action<string> log)
         }
     }
 
-    private async Task InstallAsync(string serial, string path, CancellationToken token)
+    private async Task InstallAsync(string serial, string path, string application, CancellationToken token)
     {
         log("覆盖安装（保留应用数据）：" + Path.GetFileName(path));
-        var result = await adb.RunAsync(serial, token, "install", "-r", path);
+        CommandResult result;
+        try { result = await adb.RunAsync(serial, token, "install", "-r", path); }
+        catch (AdbCommandException ex) when (IsSignatureConflict(ex.Result.Output))
+        { throw SignatureConflict(application, ex.Result, ex); }
         if (!result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Any(l => l.Trim() == "Success"))
+        {
+            if (IsSignatureConflict(result.Output)) throw SignatureConflict(application, result);
             throw new InvalidOperationException("APK 安装没有返回 Success：" + result.Output);
+        }
     }
+
+    private static bool IsSignatureConflict(string output) =>
+        output.Contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE", StringComparison.OrdinalIgnoreCase) ||
+        output.Contains("signatures do not match", StringComparison.OrdinalIgnoreCase) ||
+        output.Contains("signatures are inconsistent", StringComparison.OrdinalIgnoreCase);
+
+    private static InvalidOperationException SignatureConflict(string application, CommandResult result, Exception? inner = null) =>
+        new($"{application} 安装失败：设备内已有应用与新 APK 的签名不一致，无法覆盖安装。\n" +
+            "请使用与设备上应用签名一致的 APK；如需改用新签名，请先备份数据，再手动卸载旧应用并重新安装。\n" +
+            "卸载会清除应用数据及配置；导出 Unity files 仅备份该目录，不包含应用私有数据。工具不会自动卸载。\n\n" +
+            $"ADB 原始结果（Process.ExitCode={result.ExitCode}）：\n{result.Output}", inner);
 
     private async Task PushAsync(string serial, DeploymentItem item, bool permissions, CancellationToken token)
     {

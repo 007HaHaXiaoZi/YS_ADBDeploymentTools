@@ -113,6 +113,21 @@ internal static partial class Program
         var badAdb = new FakeAdb { InstallFailure = true };
         await ThrowsAsync(() => new DeploymentService(badAdb, _ => { }).ExecuteAsync("serial", new(UnityVariant.QC, new[] { new DeploymentItem(Component.All[0], "fake.apk"), new DeploymentItem(Component.All[^1], "fake.json") }), CancellationToken.None), "Zero-exit failed APK output must stop deployment");
         Assert(badAdb.Commands.Count == 1, "No config written after APK failure");
+        foreach (var installResult in new[] {
+            new CommandResult(1, "", "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match]"),
+            new CommandResult(0, "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]"),
+            new CommandResult(1, "Failure [INSTALL_FAILED_VERSION_DOWNGRADE]") })
+        {
+            var conflictAdb = new FakeAdb { InstallResult = installResult };
+            string message = "";
+            try { await new DeploymentService(conflictAdb, _ => { }).ExecuteAsync("serial", new(UnityVariant.QC,
+                new[] { new DeploymentItem(Component.All[0], "fake.apk"), new DeploymentItem(Component.All[^1], "fake.json") }), CancellationToken.None); }
+            catch (InvalidOperationException ex) { message = ex.Message; }
+            Assert(message.Contains("签名不一致") == installResult.Output.Contains("UPDATE_INCOMPATIBLE"), "Only signature failures get signature advice");
+            if (installResult.Output.Contains("UPDATE_INCOMPATIBLE"))
+                Assert(message.Contains("Unity") && message.Contains("卸载会清除") && message.Contains("Process.ExitCode=" + installResult.ExitCode), "Signature advice names app, warns data loss and preserves real exit code");
+            Assert(conflictAdb.Commands.Count == 1 && conflictAdb.Commands[0].Args[0] == "install", "Install failure stops writes; never automatically uninstalls");
+        }
     }
 
     private static VerifiedRelease Sign(ReleaseManifest manifest, RSA rsa)
@@ -209,9 +224,15 @@ internal static partial class Program
         public List<(string? Serial, string[] Args)> Commands = [];
         public int RootCalls;
         public bool InstallFailure;
+        public CommandResult? InstallResult;
         public Task<CommandResult> RunAsync(string? serial, CancellationToken token, params string[] arguments)
         {
             token.ThrowIfCancellationRequested(); Commands.Add((serial, arguments));
+            if (arguments[0] == "install" && InstallResult is { } result)
+            {
+                if (result.ExitCode != 0) throw new AdbCommandException("install", result);
+                return Task.FromResult(result);
+            }
             return Task.FromResult(new CommandResult(0, arguments[0] == "install" ? InstallFailure ? "Failure [INSTALL_FAILED]" : "Success" : ""));
         }
         public Task EnsureRootAndRemountAsync(string serial, CancellationToken token) { RootCalls++; return Task.CompletedTask; }
