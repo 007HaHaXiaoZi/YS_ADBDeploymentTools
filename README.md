@@ -1,6 +1,6 @@
 # YS_ADBDeploymentTools
 
-Windows x64 的 Android ADB 部署工具。当前版本 **2.0.2**，主程序为 `YS_ADBDeploymentTools.exe`，自包含运行，无需另装 .NET。
+Windows x64 的 Android ADB 部署工具。当前版本 **2.0.3**，主程序为 `YS_ADBDeploymentTools.exe`，自包含运行，无需另装 .NET。
 
 [下载最新客户端](https://github.com/007HaHaXiaoZi/YS_ADBDeploymentTools/releases/latest/download/YS_ADBDeploymentTools.exe) · [使用说明](docs/使用说明.md) · [发布更新](docs/发布更新.md)
 
@@ -9,7 +9,7 @@ Windows x64 的 Android ADB 部署工具。当前版本 **2.0.2**，主程序为
 ## 功能
 
 - SLAM 库 / YAML 或 Launcher 部署成功后，在全部选中项目完成时自动重启一次。
-- 红色“清除 Unity 数据”按钮：确认后清除当前 Android 用户的 Unity 应用数据，保留 APK。
+- 红色“清除 Unity 数据”按钮：仅清除 Unity files 内的非配置普通文件，保留配置及应用私有数据。
 - “同步设备时间”按钮：以当前电脑时间校准设备，回读验证；需要 root。
 - 检查更新提示、准备就绪和安装完成等执行状态使用红色文字。
 
@@ -70,4 +70,4 @@ Git SSH 地址 `git@github.com:007HaHaXiaoZi/YS_ADBDeploymentTools.git` 用于�
 
 双击 `YS_ADBReleaseTool.exe` 打开菜单，可生成签名包、提交并推送所选文件、上传并发布 GitHub Release。发布功能已集成到 EXE，不依赖 PowerShell 或 GitHub CLI；需要 Git for Windows 和已登录的 GitHub HTTPS 凭据。
 
-客户端修改版本并构建、提交后，可运行 `YS_ADBReleaseTool.exe release 2.0.2 --notes "更新说明" --upload --push`。具体步骤和命令见[发布更新](docs/发布更新.md)。
+客户端修改版本并构建、提交后，可运行 `YS_ADBReleaseTool.exe release 2.0.3 --notes "更新说明" --upload --push`。具体步骤和命令见[发布更新](docs/发布更新.md)。

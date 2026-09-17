@@ -8,14 +8,20 @@ internal sealed class DeviceMaintenance(IAdbClient adb, Action<string> log, Func
 
     public async Task ClearUnityDataAsync(string serial, CancellationToken token)
     {
-        var user = (await adb.RunAsync(serial, token, "shell", "am get-current-user")).StandardOutput.Trim();
-        if (!int.TryParse(user, NumberStyles.None, CultureInfo.InvariantCulture, out var userId) || userId < 0)
-            throw new InvalidOperationException("无法确定 Android 当前用户，未清除数据。");
-        var result = await adb.RunAsync(serial, token, "shell", $"pm clear --user {userId} {DeviceInspectionService.UnityPackage}");
-        if (!result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Any(line => line.Trim() == "Success"))
-            throw new InvalidOperationException("Unity 数据清除未返回 Success：" + result.Output);
-        log("已清除当前 Android 用户的 Unity 应用数据，APK 保留。相机配置需要重新部署。");
+        await adb.RunAsync(serial, token, "shell", ClearFilesCommand);
+        log("Unity files 内的非配置普通文件已清除；配置文件、配置目录、其他目录及符号链接保留。应用私有数据未清除。");
     }
+
+    internal const string PreservedConfigurations = "JSON、YAML/YML、INI、CFG、CONF、CONFIG、XML、TOML、PROPERTIES 文件，以及 config/configs/configuration/settings 目录（不区分大小写）";
+
+    // 固定目录，cd 失败即停止；不跟随符号链接、不跨文件系统，不删除目录。
+    // find 的批量 -exec 将 rm 失败传递为非零退出码，保留 ADB 原始错误。
+    internal static string ClearFilesCommand => "target='" + Component.UnityDirectory + "'; " +
+        "[ -d \"$target\" ] && [ ! -L \"$target\" ] && cd -P \"$target\" && " +
+        "find . -xdev \\( -type d \\( -iname config -o -iname configs -o -iname configuration -o -iname settings \\) -prune \\) -o " +
+        "\\( -type f ! -iname '*.json' ! -iname '*.yaml' ! -iname '*.yml' ! -iname '*.ini' " +
+        "! -iname '*.cfg' ! -iname '*.conf' ! -iname '*.config' ! -iname '*.xml' ! -iname '*.toml' ! -iname '*.properties' " +
+        "-exec rm -f -- {} + \\)";
 
     public async Task SyncTimeAsync(string serial, CancellationToken token)
     {

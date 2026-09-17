@@ -350,7 +350,7 @@ internal sealed partial class MainForm : Form
         if (_busy) return;
         if (_adb == null || _devices.SelectedItem is not Device device) { MessageBox.Show(this, "请先选择目标设备。"); return; }
         if (clearData && MessageBox.Show(this,
-            $"目标设备：{device.Description}\n将清除 com.horeal.UnityAndroid 的全部应用数据（当前 Android 用户），包括设置、缓存及相机配置，保留 APK。此操作不可撤销。\n可先使用“导出 Unity files…”备份。确定清除？",
+            $"目标设备：{device.Description}\n仅清除 {Component.UnityDirectory}/ 内的非配置普通文件（含子目录）。\n保留：{DeviceMaintenance.PreservedConfigurations}。\n保留目录、符号链接和应用私有数据。删除的文件不可恢复，可先导出备份。确定清除？",
             "清除 Unity 数据", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
         CancelInspection(); SetBusy(true, clearData ? "正在清除 Unity 数据…" : "正在同步设备时间…");
         try
