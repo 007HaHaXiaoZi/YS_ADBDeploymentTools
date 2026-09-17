@@ -117,10 +117,13 @@ internal sealed class DeploymentService(IAdbClient adb, Action<string> log)
             await adb.RunAsync(serial, token, "shell", "cd /system_ext/priv-app/Launcher3QuickStep && " +
                 "{ if [ -f Launcher3QuickStep.apk ] && [ ! -e Launcher3QuickStep.apk.bak ]; then mv Launcher3QuickStep.apk Launcher3QuickStep.apk.bak || exit 1; fi; } && " +
                 "{ if [ -d oat ] && [ ! -e oat_bak ]; then mv oat oat_bak || exit 1; fi; } && sync");
-            await adb.RunAsync(serial, token, "reboot");
-            log("已发送设备重启命令；请等待设备启动后验收。");
         }
-        else await adb.RunAsync(serial, token, "shell", "sync");
+        await adb.RunAsync(serial, token, "shell", "sync");
+        if (system.Length > 0 || launcher != null)
+        {
+            await adb.RunAsync(serial, token, "reboot");
+            log("SLAM / Launcher 部署完成，已发送设备重启命令；请等待设备启动后刷新设备。");
+        }
     }
 
     private async Task InstallAsync(string serial, string path, CancellationToken token)

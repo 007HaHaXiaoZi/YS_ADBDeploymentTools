@@ -19,6 +19,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw '测试构建失败。' }
         & '.\tests\DeploymentTool.Tests\bin\Release\net9.0-windows\win-x64\DeploymentTool.Tests.exe'
         if ($LASTEXITCODE -ne 0) { throw '测试未通过。' }
+        & $dotnet build '.\tests\ReleaseTool.Tests\ReleaseTool.Tests.csproj' -c Release @restoreArgs
+        if ($LASTEXITCODE -ne 0) { throw '发布工具测试构建失败。' }
+        & '.\tests\ReleaseTool.Tests\bin\Release\net9.0\win-x64\ReleaseTool.Tests.exe'
+        if ($LASTEXITCODE -ne 0) { throw '发布工具测试未通过。' }
     }
     & $dotnet publish '.\src\AdbDeploymentTool\AdbDeploymentTool.csproj' -c Release -o '.\.build\publish\client' @restoreArgs
     if ($LASTEXITCODE -ne 0) { throw '客户端构建失败。' }

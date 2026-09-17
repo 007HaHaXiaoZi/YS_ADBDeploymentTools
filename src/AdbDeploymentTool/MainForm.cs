@@ -40,6 +40,15 @@ internal sealed partial class MainForm : Form
     public MainForm(bool preview = false)
     {
         Text = ApplicationIdentity.Name + " v" + UpdateService.AppVersion;
+        using (var iconStream = typeof(MainForm).Assembly.GetManifestResourceStream("ys-adb.ico"))
+        {
+            if (iconStream != null)
+            {
+                var appIcon = new Icon(iconStream);
+                Icon = appIcon;
+                Disposed += (_, _) => appIcon.Dispose();
+            }
+        }
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Microsoft YaHei UI", 9.5f);
@@ -47,6 +56,9 @@ internal sealed partial class MainForm : Form
         ClientSize = new Size(1240, 850);
         MinimumSize = new Size(1120, 760);
         BuildLayout();
+        _status.ForeColor = Color.Red;
+        _updateStatus.ForeColor = Color.Red;
+        _checkUpdate.ForeColor = Color.Red;
         try { _settings = UpdateSettings.Load(_root); } catch (Exception ex) { Log("更新配置读取失败，使用默认 GitHub 地址：" + ex.Message); }
         LoadSelection(); ReloadSources();
         _qc.CheckedChanged += (_, _) => { if (_qc.Checked) { ReloadSources(); _ = RefreshDeviceStatusAsync(); } };
@@ -137,8 +149,12 @@ internal sealed partial class MainForm : Form
             ActionButton("全部跳过", () => SetPreset(_ => false))), 0, 4);
         var deploy = ActionButton("执行选中项目", async () => await DeployAsync());
         deploy.BackColor = Color.FromArgb(37, 99, 235); deploy.ForeColor = Color.White; deploy.FlatStyle = FlatStyle.Flat;
-        layout.Controls.Add(Flow(deploy, ActionButton("导出 Unity files…", async () => await ExportAsync()),
-            Label("覆盖 Launcher 会备份系统桌面并重启设备。")), 0, 5);
+        var clear = ActionButton("清除 Unity 数据", async () => await MaintainDeviceAsync(true));
+        clear.BackColor = Color.Firebrick; clear.ForeColor = Color.White; clear.FlatStyle = FlatStyle.Flat;
+        clear.UseVisualStyleBackColor = false;
+        layout.Controls.Add(Flow(deploy, ActionButton("导出 Unity files…", async () => await ExportAsync()), clear,
+            ActionButton("同步设备时间", async () => await MaintainDeviceAsync(false)),
+            Label("SLAM / Launcher 部署成功后自动重启。")), 0, 5);
         var settings = ActionButton("更新设置", EditUpdateSettings);
         _installUpdate.Enabled = false;
         layout.Controls.Add(Flow(_checkUpdate, _installUpdate, settings, _updateStatus), 0, 6);
@@ -304,7 +320,7 @@ internal sealed partial class MainForm : Form
                 files.Where(p => p.Value != null).ToDictionary(p => p.Key, p => p.Value!));
             SaveSelection(); CancelInspection(); ClearDeviceStates("待重新检测"); SetBusy(true, "正在部署，请保持 USB 连接…");
             await new DeploymentService(new AdbClient(_adb, Log), Log).ExecuteAsync(device.Serial, plan, _lifetime.Token);
-            Log("选中项目部署成功。"); _status.Text = "部署成功";
+            Log("选中项目部署成功。"); _status.Text = "安装完成";
         }
         catch (Exception ex) { Log("部署未完成：" + ex.Message); _status.Text = "部署未完成"; MessageBox.Show(this, ex.Message, "部署未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         finally { SetBusy(false, _status.Text); }
@@ -325,6 +341,26 @@ internal sealed partial class MainForm : Form
             MessageBox.Show(this, "文件已导出到：\n" + target, "导出完成");
         }
         catch (Exception ex) { Log("导出失败：" + ex.Message); _status.Text = "导出失败"; MessageBox.Show(this, ex.Message, "导出失败"); }
+        finally { SetBusy(false, _status.Text); }
+        await RefreshDeviceStatusAsync();
+    }
+
+    private async Task MaintainDeviceAsync(bool clearData)
+    {
+        if (_busy) return;
+        if (_adb == null || _devices.SelectedItem is not Device device) { MessageBox.Show(this, "请先选择目标设备。"); return; }
+        if (clearData && MessageBox.Show(this,
+            $"目标设备：{device.Description}\n将清除 com.horeal.UnityAndroid 的全部应用数据（当前 Android 用户），包括设置、缓存及相机配置，保留 APK。此操作不可撤销。\n可先使用“导出 Unity files…”备份。确定清除？",
+            "清除 Unity 数据", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+        CancelInspection(); SetBusy(true, clearData ? "正在清除 Unity 数据…" : "正在同步设备时间…");
+        try
+        {
+            var service = new DeviceMaintenance(new AdbClient(_adb, Log), Log);
+            if (clearData) await service.ClearUnityDataAsync(device.Serial, _lifetime.Token);
+            else await service.SyncTimeAsync(device.Serial, _lifetime.Token);
+            _status.Text = clearData ? "Unity 数据清除完成" : "时间同步完成";
+        }
+        catch (Exception ex) { _status.Text = "操作未完成"; Log(ex.Message); MessageBox.Show(this, ex.Message, "操作未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         finally { SetBusy(false, _status.Text); }
         await RefreshDeviceStatusAsync();
     }

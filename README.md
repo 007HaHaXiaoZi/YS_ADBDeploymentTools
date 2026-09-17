@@ -1,12 +1,17 @@
 # YS_ADBDeploymentTools
 
-Windows x64 的 Android ADB 部署工具。当前版本 **2.0.0**，主程序为 `YS_ADBDeploymentTools.exe`，自包含运行，无需另装 .NET。
+Windows x64 的 Android ADB 部署工具。当前版本 **2.0.2**，主程序为 `YS_ADBDeploymentTools.exe`，自包含运行，无需另装 .NET。
 
 [下载最新客户端](https://github.com/007HaHaXiaoZi/YS_ADBDeploymentTools/releases/latest/download/YS_ADBDeploymentTools.exe) · [使用说明](docs/使用说明.md) · [发布更新](docs/发布更新.md)
 
 ![界面](docs/ui-preview.png)
 
 ## 功能
+
+- SLAM 库 / YAML 或 Launcher 部署成功后，在全部选中项目完成时自动重启一次。
+- 红色“清除 Unity 数据”按钮：确认后清除当前 Android 用户的 Unity 应用数据，保留 APK。
+- “同步设备时间”按钮：以当前电脑时间校准设备，回读验证；需要 root。
+- 检查更新提示、准备就绪和安装完成等执行状态使用红色文字。
 
 - QC（全彩）/ DL（单绿）Unity APK 互斥选择，严格匹配大写型号。
 - Unity、Launcher、两个 SO、YAML 和两个 JSON 分别选择覆盖或跳过。
@@ -23,7 +28,7 @@ Windows x64 的 Android ADB 部署工具。当前版本 **2.0.0**，主程序为
 
 ```text
 YS_ADBDeploymentTools.exe   # 客户端
-YS_ADBReleaseTool.exe       # 发布者签名打包工具
+YS_ADBReleaseTool.exe       # 发布者工具：签名打包、Git 提交推送、GitHub Release 发布
 publisher-public.pem       # 公开签名公钥（也已嵌入客户端）
 tools/                     # 本地 APK、SO、JSON、YAML；不提交 Git
 src/                       # 可维护源码
@@ -55,8 +60,14 @@ Git SSH 地址 `git@github.com:007HaHaXiaoZi/YS_ADBDeploymentTools.git` 用于�
 .\tests\Test-PackagedUpdater.ps1
 ```
 
-已通过 1658 项断言，包括全部 127 种非空覆盖组合、ADB 实际子进程捕获、APK 清单解析、设备只读检测、自定义路径、数据导出、签名验证和更新回滚。APK 包名解析另外验证了当前本地三个实际 APK。
+自动测试覆盖全部 127 种非空覆盖组合、SLAM 重启顺序、ADB 实际子进程捕获、APK 清单解析、权限检测、自定义路径、数据导出、数据清除命令范围、时间同步校验、签名验证和更新回滚。APK 包名解析另外验证了当前本地三个实际 APK。
 
 设备检测、导出的自动测试使用模拟 ADB，未在发布过程中对真实 Android 执行安装、替换或导出。真实设备需要允许 USB 调试与对应文件访问；系统库/Launcher 部署仍要求固件支持 root/remount。
 
 发布私钥保存在发布者本机 `.release-private/`，不得提交仓库或打包分发。Git 同时忽略缓存、构建中间文件、用户选项和导出数据。
+
+## 发布工具
+
+双击 `YS_ADBReleaseTool.exe` 打开菜单，可生成签名包、提交并推送所选文件、上传并发布 GitHub Release。发布功能已集成到 EXE，不依赖 PowerShell 或 GitHub CLI；需要 Git for Windows 和已登录的 GitHub HTTPS 凭据。
+
+客户端修改版本并构建、提交后，可运行 `YS_ADBReleaseTool.exe release 2.0.2 --notes "更新说明" --upload --push`。具体步骤和命令见[发布更新](docs/发布更新.md)。

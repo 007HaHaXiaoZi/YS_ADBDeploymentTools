@@ -29,6 +29,7 @@ internal static partial class Program
             Console.WriteLine("Testing deployment selections..."); TestDeployment(root).GetAwaiter().GetResult();
             Console.WriteLine("Testing metadata, device inspection, custom sources and export..."); TestInspection(root).GetAwaiter().GetResult();
             Console.WriteLine("Testing update transactions..."); TestUpdates(root).GetAwaiter().GetResult();
+            Console.WriteLine("Testing device maintenance..."); TestMaintenance().GetAwaiter().GetResult();
             Console.WriteLine($"PASS: {_checks} assertions; UI radio groups, 127 deployment selections, signed downloads, rollback and crash recovery.");
             return 0;
         }
@@ -98,7 +99,9 @@ internal static partial class Program
             Assert(installs.Length == selected.Count(id => id is "Unity" or "Launcher"), "APK skipping");
             Assert(installs.All(c => c.Args[1] == "-r"), "APK updates preserve data");
             Assert(installs.All(c => c.Args[2] != qc), "DL mode cannot install QC");
-            Assert(adb.Commands.Any(c => c.Args[0] == "reboot") == selected.Contains("Launcher"), "Skipping Launcher skips reboot");
+            var rebootExpected = plan.Items.Any(i => i.Component.Group is DeploymentGroup.System or DeploymentGroup.Launcher);
+            Assert(adb.Commands.Count(c => c.Args[0] == "reboot") == (rebootExpected ? 1 : 0), "SLAM and Launcher reboot exactly once");
+            if (rebootExpected) Assert(adb.Commands[^1].Args[0] == "reboot" && adb.Commands[^2].Args.SequenceEqual(new[] { "shell", "sync" }), "Reboot occurs only after all writes and sync");
             Assert(adb.RootCalls > 0 == plan.Items.Any(i => i.Component.Group is DeploymentGroup.System or DeploymentGroup.Launcher), "Root only for selected system/Launcher work");
         }
         var effectOnly = DeploymentPlan.Create(catalog, UnityVariant.DL, new HashSet<string> { "CameraEffect.json" }, null, null);

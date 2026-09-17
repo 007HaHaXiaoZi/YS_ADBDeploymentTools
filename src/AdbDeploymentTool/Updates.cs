@@ -41,7 +41,7 @@ internal sealed class UpdateService : IDisposable
 {
     public const string Product = ApplicationIdentity.Name;
     public const string ExeName = ApplicationIdentity.Name + ".exe";
-    public const string AppVersion = "2.0.1";
+    public const string AppVersion = "2.0.2";
     private readonly HttpClient _http;
     private readonly string _root;
     private readonly UpdateSettings _settings;

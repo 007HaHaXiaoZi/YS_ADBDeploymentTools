@@ -9,4 +9,5 @@
  </PropertyGroup>
  <ItemGroup><Compile Include="../AdbDeploymentTool/Updates.cs" Link="Updates.cs"/><Compile Include="../AdbDeploymentTool/Deployment.cs" Link="Deployment.cs"/></ItemGroup>
  <ItemGroup><Compile Include="../AdbDeploymentTool/ApplicationIdentity.cs" Link="ApplicationIdentity.cs"/><EmbeddedResource Include="../../publisher-public.pem" LogicalName="publisher-public.pem" /></ItemGroup>
+ <ItemGroup><InternalsVisibleTo Include="ReleaseTool.Tests" /></ItemGroup>
 </Project>

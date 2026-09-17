@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>YS_ADBDeploymentTools</AssemblyName>
     <Product>YS_ADBDeploymentTools</Product>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <RuntimeFrameworkVersion>9.0.11</RuntimeFrameworkVersion>
     <PublishSingleFile>true</PublishSingleFile>
@@ -16,7 +16,9 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>none</DebugType>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/ys-adb.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup><InternalsVisibleTo Include="DeploymentTool.Tests" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../../publisher-public.pem" LogicalName="publisher-public.pem" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Assets/ys-adb.ico" LogicalName="ys-adb.ico" /></ItemGroup>
 </Project>
